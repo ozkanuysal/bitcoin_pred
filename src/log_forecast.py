@@ -34,29 +34,35 @@ def log_forecast():
     )
 
     df = load_data()
-    df = df.copy() 
+    if df.empty:
+        st.error("No valid data available for prediction.")
+        return
+    df = df.copy()
     df = df.rename(columns={'price': 'y', 'timestamp': 'ds'})
     # Store original y before log transform for the final plot
     df['y_orig'] = df['y']
-    df['y'] = np.log(df['y']) 
-    
+    df['y'] = np.log(df['y'])
+
+    st.header("Bitcoin Price Prediction")
+    st.markdown("This page uses Facebook Prophet to forecast Bitcoin prices. Adjust the hyperparameters in the sidebar and click 'Fit Model on Log Prices' to see the prediction.")
+
     fit_model = st.button("Fit Model on Log Prices")
     if not fit_model:
         return
 
-    # Fit the model using selected hyperparameters
     with st.spinner(f'Training the forecasting model with C:{cp_prior_scale}, S:{seasonality_prior_scale}...'):
-        model = Prophet(
-            changepoint_prior_scale=cp_prior_scale,
-            seasonality_prior_scale=seasonality_prior_scale
-        ).fit(df[['ds', 'y']])
-
-        future = model.make_future_dataframe(periods=365)
-        forecast = model.predict(future)
-
-
-        main_plot = plot_plotly(model, forecast)
-        fig_components = plot_components_plotly(model, forecast)
+        try:
+            model = Prophet(
+                changepoint_prior_scale=cp_prior_scale,
+                seasonality_prior_scale=seasonality_prior_scale
+            ).fit(df[['ds', 'y']])
+            future = model.make_future_dataframe(periods=365)
+            forecast = model.predict(future)
+            main_plot = plot_plotly(model, forecast)
+            fig_components = plot_components_plotly(model, forecast)
+        except Exception as e:
+            st.error(f"Prophet model failed: {e}")
+            return
 
     st.subheader('Forecast and Components Plots')
     st.plotly_chart(main_plot, use_container_width=True)
@@ -71,26 +77,20 @@ def log_forecast():
     df['y'] = np.exp(df['y'])
     # Create a new plot for the original scale
     fig_original_scale = go.Figure()
-
-    # Add actual prices (original scale)
     fig_original_scale.add_trace(go.Scatter(
-        x=df['ds'], 
-        y=df['y'], 
-        name='Actual', 
+        x=df['ds'],
+        y=df['y'],
+        name='Actual',
         mode='markers',
         marker=dict(color='black', size=4)
     ))
-
-    # Add forecast (original scale)
     fig_original_scale.add_trace(go.Scatter(
-        x=forecast['ds'], 
-        y=forecast['yhat'], 
-        name='Forecast', 
-        mode='lines', 
+        x=forecast['ds'],
+        y=forecast['yhat'],
+        name='Forecast',
+        mode='lines',
         line=dict(color='blue')
     ))
-
-    # Add confidence interval (original scale)
     fig_original_scale.add_trace(go.Scatter(
         x=forecast['ds'],
         y=forecast['yhat_upper'],
@@ -99,16 +99,18 @@ def log_forecast():
         line=dict(color='rgba(0,0,255,0.1)'),
         name='Upper Confidence Interval',
     ))
-    # Add lower confidence interval (original scale)
     fig_original_scale.add_trace(go.Scatter(
         x=forecast['ds'],
         y=forecast['yhat_lower'],
-        fill=None, 
-        mode='lines',   
+        fill=None,
+        mode='lines',
         line=dict(color='rgba(0,0,255,0.1)'),
         name='Lower Confidence Interval',
     ))
-    
     fig_original_scale.update_layout(yaxis_type="log")
-    
     st.plotly_chart(fig_original_scale, use_container_width=True)
+
+    # Show next 30 days prediction summary
+    st.subheader("Next 30 Days Bitcoin Price Forecast")
+    forecast_next_30 = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(30)
+    st.dataframe(forecast_next_30, use_container_width=True)
