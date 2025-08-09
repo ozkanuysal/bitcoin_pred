@@ -56,7 +56,7 @@ def log_forecast():
                 changepoint_prior_scale=cp_prior_scale,
                 seasonality_prior_scale=seasonality_prior_scale
             ).fit(df[['ds', 'y']])
-            future = model.make_future_dataframe(periods=365)
+            future = model.make_future_dataframe(periods=30)
             forecast = model.predict(future)
             main_plot = plot_plotly(model, forecast)
             fig_components = plot_components_plotly(model, forecast)

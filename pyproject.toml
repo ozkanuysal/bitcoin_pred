@@ -11,4 +11,5 @@ dependencies = [
     "pyarrow>=21.0.0",
     "streamlit>=1.47.1",
     "yfinance>=0.2.64",
+    "statsmodels>=0.14.5",
 ]

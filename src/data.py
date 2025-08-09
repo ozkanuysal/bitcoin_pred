@@ -19,20 +19,16 @@ def load_data(for_display=False):
     df['timestamp'] = pd.to_datetime(df['timestamp'], format="%m/%d/%Y", errors='coerce', utc=True)
     # Remove timezone info
     df['timestamp'] = df['timestamp'].dt.tz_localize(None)
+    # Truncate excessive precision (microseconds)
+    df['timestamp'] = df['timestamp'].dt.floor('ns')
     # Drop rows with invalid timestamps
     num_invalid = df['timestamp'].isna().sum()
     if num_invalid > 0:
         st.warning(f"Dropping {num_invalid} rows with invalid timestamps.")
         df = df.dropna(subset=['timestamp'])
-    # Ensure no mixed types
-    try:
-        df['timestamp'] = df['timestamp'].astype('datetime64[ns]')
-    except Exception as e:
-        st.warning(f"Could not convert timestamp to datetime64[ns]: {e}. Falling back to string for display.")
-        df['timestamp'] = df['timestamp'].astype(str)
-    if for_display:
-        # Always convert to string for display to guarantee Arrow compatibility
-        df['timestamp'] = df['timestamp'].astype(str)
+    # Ensure Arrow compatibility: always convert to string for display
+    if for_display or not pd.api.types.is_datetime64_ns_dtype(df['timestamp']):
+        df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
     # Final check for Arrow compatibility
     if df['timestamp'].dtype == 'O':
         st.warning("Timestamp column is object dtype. Displaying as string. Some features may be limited.")
