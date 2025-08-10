@@ -14,7 +14,7 @@ def general_view():
     st.write(df.describe())
 
     st.subheader('First 5 rows of the dataset')
-    st.write(df.head())
+    st.write(df.tail())
 
     # Logarithmic Growth Curve
     df['log_price'] = np.log(df['price'])
