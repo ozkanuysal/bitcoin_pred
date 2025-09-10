@@ -32,19 +32,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests pandas
       
-    - name: Determine days parameter
-      id: get-days
+    - name: Calculate days based on existing files
+      id: calculate-days
       run: |
-        # Zamanı kontrol et ve kaç günlük veri çekileceğini belirle
-        MINUTES=$(date +%M)
-        CYCLE=$(( (MINUTES / 5) % 3 ))
-        
-        if [ $CYCLE -eq 0 ]; then
-          DAYS=30
-        elif [ $CYCLE -eq 1 ]; then
-          DAYS=31
+        # Metadata dosyasını kontrol et
+        if [ -f "data/metadata.json" ]; then
+          # Son kullanılan gün sayısını al
+          LAST_DAYS=$(grep -o '"days": [0-9]*' data/metadata.json | awk '{print $2}')
+          # Bir sonraki gün sayısını hesapla
+          DAYS=$((LAST_DAYS + 1))
         else
-          DAYS=32
+          # İlk çalıştırma, varsayılan gün sayısını kullan
+          DAYS=30
+        fi
+        
+        # Fazla büyümeyi önlemek için üst sınır (isteğe bağlı)
+        if [ $DAYS -gt 365 ]; then
+          DAYS=30
         fi
         
         echo "DAYS=$DAYS" >> $GITHUB_OUTPUT
@@ -52,7 +56,7 @@ jobs:
       
     - name: Fetch Bitcoin data
       run: |
-        python src/fetch_data_script.py ${{ steps.get-days.outputs.DAYS }}
+        python src/fetch_data_script.py ${{ steps.calculate-days.outputs.DAYS }}
       
     - name: Set up Git
       run: |
@@ -67,6 +71,6 @@ jobs:
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Auto fetch BTC data for last ${{ steps.get-days.outputs.DAYS }} days"
+          git commit -m "Auto fetch BTC data for last ${{ steps.calculate-days.outputs.DAYS }} days"
           git push
         fi

@@ -83,8 +83,10 @@ def main():
         sys.exit(1)
     
     # CSV dosyasını kaydet
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"BTC_USD_{days_ago}days_{timestamp}.csv"
+    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # filename = f"BTC_USD_{days_ago}days_{timestamp}.csv"
+    # csv_path = os.path.join(data_dir, filename)
+    filename = f"BTC_USD_{days_ago}days.csv"
     csv_path = os.path.join(data_dir, filename)
     
     df.to_csv(csv_path, index=False)
