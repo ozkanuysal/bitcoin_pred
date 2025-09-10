@@ -1,43 +1,60 @@
 import pandas as pd
-from binance.client import Client
+import requests
 from datetime import datetime, timedelta
 import os
 import sys
 import time
 import json
 
-def get_historical_klines(client, symbol="BTCUSDT", interval="1d", days_ago=30):
-    """Belirli bir zaman aralığı için tarihsel mum verilerini çeker"""
-    end_time = datetime.now()
-    start_time = end_time - timedelta(days=days_ago)
+def get_bitcoin_historical_data(days_ago=30):
+    """CoinGecko API'den Bitcoin fiyat verilerini çeker"""
+    # CoinGecko API endpoint
+    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
     
-    # Unix timestamp (ms) formatına dönüştür
-    start_timestamp = int(start_time.timestamp() * 1000)
-    end_timestamp = int(end_time.timestamp() * 1000)
+    # Şimdiki zaman (Unix timestamp, ms)
+    end_time = int(datetime.now().timestamp() * 1000)
+    # Belirtilen gün sayısı kadar önceki zaman
+    start_time = int((datetime.now() - timedelta(days=days_ago)).timestamp() * 1000)
+    
+    # API parametreleri
+    params = {
+        'vs_currency': 'usd',
+        'from': start_time // 1000,  # saniye cinsinden 
+        'to': end_time // 1000,      # saniye cinsinden
+        'days': days_ago
+    }
     
     try:
-        klines = client.get_historical_klines(
-            symbol=symbol,
-            interval=interval,
-            start_str=start_timestamp,
-            end_str=end_timestamp
-        )
+        print(f"CoinGecko API'den son {days_ago} günün verilerini çekiyorum...")
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Hata durumunda exception fırlat
         
-        # Veriyi DataFrame'e dönüştür
-        df = pd.DataFrame(klines, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_asset_volume', 'number_of_trades',
-            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
-        ])
+        data = response.json()
         
-        # Veri tiplerini düzenle
+        # Fiyat verileri [timestamp, price] formatında
+        prices = data.get('prices', [])
+        # Hacim verileri [timestamp, volume] formatında 
+        volumes = data.get('total_volumes', [])
+        
+        # Timestamp ve fiyat verilerini DataFrame'e dönüştür
+        df_prices = pd.DataFrame(prices, columns=['timestamp', 'close'])
+        df_volumes = pd.DataFrame(volumes, columns=['timestamp', 'volume'])
+        
+        # DataFrame'leri birleştir
+        df = pd.merge(df_prices, df_volumes, on='timestamp', how='left')
+        
+        # Timestamp'i datetime'a dönüştür
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df['date'] = df['timestamp'].dt.date
         
-        numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-        df[numeric_columns] = df[numeric_columns].astype(float)
+        # OHLC verisi için - CoinGecko sadece kapanış fiyatı veriyor, 
+        # basit bir yaklaşımla aynı değeri diğer alanlara kopyalayalım
+        # Not: Bu gerçek OHLC verisi değil, sadece veri yapısını korumak için
+        df['open'] = df['close']
+        df['high'] = df['close']
+        df['low'] = df['close']
         
-        # Gereksiz sütunları kaldır
+        # Sütunları yeniden düzenle
         df = df[['timestamp', 'date', 'open', 'high', 'low', 'close', 'volume']]
         
         return df
@@ -53,22 +70,13 @@ def main():
     else:
         days_ago = 30  # Default değer
     
-    symbol = "BTCUSDT"
-    interval = "1d"
-    
     # Data klasörünü oluştur (yoksa)
     data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     
-    # Binance client oluştur
-    # Not: API anahtarları olmadan da public verilere erişilebilir
-    client = Client()
-    
-    print(f"Son {days_ago} günün verilerini çekiyorum...")
-    
     # Veriyi çek
-    df = get_historical_klines(client, symbol=symbol, interval=interval, days_ago=days_ago)
+    df = get_bitcoin_historical_data(days_ago=days_ago)
     
     if df.empty:
         print("Veri çekilemedi!")
@@ -76,7 +84,7 @@ def main():
     
     # CSV dosyasını kaydet
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{symbol}_{interval}_{days_ago}days_{timestamp}.csv"
+    filename = f"BTC_USD_{days_ago}days_{timestamp}.csv"
     csv_path = os.path.join(data_dir, filename)
     
     df.to_csv(csv_path, index=False)
@@ -85,11 +93,11 @@ def main():
     metadata_file = os.path.join(data_dir, "metadata.json")
     metadata = {
         "last_update": datetime.now().isoformat(),
-        "symbol": symbol,
-        "interval": interval,
+        "symbol": "BTC/USD",
         "days": days_ago,
         "records": len(df),
-        "filename": filename
+        "filename": filename,
+        "source": "CoinGecko"
     }
     
     with open(metadata_file, 'w') as f:
