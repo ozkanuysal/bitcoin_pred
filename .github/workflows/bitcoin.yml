@@ -1,10 +1,12 @@
 name: Fetch Bitcoin Data
 
 on:
+  push:
+    branches:
+      - main 
   schedule:
-    # Her 5 dakikada bir çalıştır
     - cron: '*/5 * * * *'
-  workflow_dispatch:  # Manuel tetikleme için
+  workflow_dispatch:
 
 jobs:
   fetch_data:
