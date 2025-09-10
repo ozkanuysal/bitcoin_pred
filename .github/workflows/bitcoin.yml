@@ -8,6 +8,10 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+# Workflow için gereken izinleri ekleyin
+permissions:
+  contents: write
+
 jobs:
   fetch_data:
     runs-on: ubuntu-latest
