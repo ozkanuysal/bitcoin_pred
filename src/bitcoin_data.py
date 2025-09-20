@@ -36,6 +36,9 @@ def bitcoin_data():
             df = binance.get_historical_klines(symbol=symbol, interval=interval, days_ago=days)
             
             if not df.empty:
+                # Verileri ters çevir (yeni tarihten eskiye doğru sırala)
+                df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+                
                 st.session_state['df_btc'] = df
                 st.session_state['symbol'] = symbol
                 st.session_state['interval'] = interval
@@ -55,7 +58,7 @@ def bitcoin_data():
                 st.metric(
                     label=f"Güncel {current_symbol} Fiyatı", 
                     value=f"${current_price:.2f}",
-                    delta=f"{((current_price - df['close'].iloc[-2]) / df['close'].iloc[-2] * 100):.2f}%"
+                    delta=f"{((current_price - df['close'].iloc[0]) / df['close'].iloc[0] * 100):.2f}%"
                 )
             except:
                 st.warning("Güncel fiyat alınamadı.")
@@ -95,7 +98,8 @@ def bitcoin_data():
             
             with stats_col3:
                 st.metric("Ortalama", f"${df['close'].mean():.2f}")
-                st.metric("Değişim %", f"{((df['close'].iloc[-1] - df['close'].iloc[0]) / df['close'].iloc[0] * 100):.2f}%")
+                # İlk ve son değerler ters çevrildiği için indeksler güncellendi
+                st.metric("Değişim %", f"{((df['close'].iloc[0] - df['close'].iloc[-1]) / df['close'].iloc[-1] * 100):.2f}%")
             
             # Ham veriyi göster
             with st.expander("Ham Veriyi Göster"):

@@ -57,6 +57,9 @@ def get_bitcoin_historical_data(days_ago=30):
         # Sütunları yeniden düzenle
         df = df[['timestamp', 'date', 'open', 'high', 'low', 'close', 'volume']]
         
+        # Verileri ters çevir (yeni tarihten eskiye doğru sırala)
+        df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        
         return df
             
     except Exception as e:
