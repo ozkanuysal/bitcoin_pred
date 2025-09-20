@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from .binance_data import BinanceDataFetcher
 import matplotlib.pyplot as plt
 
@@ -39,6 +40,10 @@ def bitcoin_data():
                 # Verileri ters çevir (yeni tarihten eskiye doğru sırala)
                 df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
                 
+                # Fiyat değişimi hesapla
+                df['price_change'] = df['close'].diff(-1)  # Bir önceki güne göre değişim
+                df['price_change_pct'] = (df['close'] / df['close'].shift(-1) - 1) * 100  # Yüzdelik değişim
+                
                 st.session_state['df_btc'] = df
                 st.session_state['symbol'] = symbol
                 st.session_state['interval'] = interval
@@ -63,15 +68,28 @@ def bitcoin_data():
             except:
                 st.warning("Güncel fiyat alınamadı.")
             
-            # Mum grafiği (Plotly ile)
-            fig = go.Figure(data=[go.Candlestick(
+            # Alt alta iki grafik oluştur (mum grafiği ve değişim grafiği)
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                              vertical_spacing=0.05, row_heights=[0.7, 0.3])
+            
+            # Mum grafiği ekle
+            fig.add_trace(go.Candlestick(
                 x=df['timestamp'],
                 open=df['open'],
                 high=df['high'],
                 low=df['low'],
                 close=df['close'],
                 name=current_symbol
-            )])
+            ), row=1, col=1)
+            
+            # Değişim grafiği ekle (bar chart)
+            colors = ['red' if x < 0 else 'green' for x in df['price_change_pct']]
+            fig.add_trace(go.Bar(
+                x=df['timestamp'], 
+                y=df['price_change_pct'],
+                name='Günlük Değişim %',
+                marker_color=colors
+            ), row=2, col=1)
             
             # Grafiği özelleştir
             fig.update_layout(
@@ -79,8 +97,11 @@ def bitcoin_data():
                 xaxis_title='Tarih',
                 yaxis_title='Fiyat (USDT)',
                 xaxis_rangeslider_visible=False,
-                height=500
+                height=700
             )
+            
+            # İkinci grafik için y ekseni başlığı
+            fig.update_yaxes(title_text="Değişim %", row=2, col=1)
             
             st.plotly_chart(fig, use_container_width=True)
             
@@ -91,19 +112,26 @@ def bitcoin_data():
             with stats_col1:
                 st.metric("En Yüksek", f"${df['high'].max():.2f}")
                 st.metric("Ortalama Hacim", f"{df['volume'].mean():.2f} BTC")
+                st.metric("En Yüksek Günlük Artış", f"+{df['price_change_pct'].max():.2f}%")
             
             with stats_col2:
                 st.metric("En Düşük", f"${df['low'].min():.2f}")
                 st.metric("Standart Sapma", f"${df['close'].std():.2f}")
+                st.metric("En Büyük Günlük Düşüş", f"{df['price_change_pct'].min():.2f}%")
             
             with stats_col3:
                 st.metric("Ortalama", f"${df['close'].mean():.2f}")
-                # İlk ve son değerler ters çevrildiği için indeksler güncellendi
                 st.metric("Değişim %", f"{((df['close'].iloc[0] - df['close'].iloc[-1]) / df['close'].iloc[-1] * 100):.2f}%")
+                st.metric("Ort. Günlük Değişim", f"{df['price_change_pct'].mean():.2f}%")
             
             # Ham veriyi göster
             with st.expander("Ham Veriyi Göster"):
-                st.dataframe(df)
+                # Price change sütunlarını güzelleştir
+                display_df = df.copy()
+                display_df['price_change'] = display_df['price_change'].map('${:,.2f}'.format)
+                display_df['price_change_pct'] = display_df['price_change_pct'].map('{:,.2f}%'.format)
+                
+                st.dataframe(display_df)
                 
                 # CSV indirme düğmesi
                 csv = df.to_csv(index=False).encode('utf-8')
