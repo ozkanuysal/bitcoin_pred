@@ -1,0 +1,63 @@
+name: Bitcoin Quick Prediction
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # Her gece 01:00'da çalışır
+  workflow_dispatch:
+
+jobs:
+  quick_predict:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas prophet statsmodels
+
+    - name: Find latest CSV file
+      id: find_csv
+      run: |
+        latest_csv=$(ls -t data/BTC_USD_*.csv | head -n 1)
+        echo "LATEST_CSV=$latest_csv" >> $GITHUB_ENV
+
+    - name: Run quick prediction and save results
+      run: |
+        mkdir -p prediction
+        python src/quick_predict.py $LATEST_CSV > prediction/latest_prediction.txt
+
+        # Prophet ve ARIMA tahminlerini JSON formatına çevir
+        prophet_line=$(grep "Prophet ile" prediction/latest_prediction.txt | tail -1)
+        arima_line=$(grep "ARIMA ile" prediction/latest_prediction.txt | tail -1)
+        prophet_date=$(echo $prophet_line | awk '{print $3}')
+        prophet_value=$(echo $prophet_line | awk '{print $6}')
+        arima_date=$(echo $arima_line | awk '{print $3}')
+        arima_value=$(echo $arima_line | awk '{print $6}')
+        jq -n \
+          --arg prophet_date "$prophet_date" \
+          --arg prophet_value "$prophet_value" \
+          --arg arima_date "$arima_date" \
+          --arg arima_value "$arima_value" \
+          '{
+            "prophet": {"date": $prophet_date, "prediction": $prophet_value},
+            "arima": {"date": $arima_date, "prediction": $arima_value}
+          }' > prediction/latest_prediction.json
+
+    - name: Commit and push predictions
+      run: |
+        git config --global user.name 'GitHub Actions Bot'
+        git config --global user.email 'actions@github.com'
+        git add prediction/latest_prediction.json prediction/latest_prediction.txt
+        if git diff --staged --quiet; then
+          echo "No prediction changes to commit"
+        else
+          git commit -m "Auto prediction for latest BTC data"
+          git push
