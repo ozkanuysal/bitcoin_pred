@@ -22,7 +22,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pandas prophet statsmodels jq
+        pip install pandas prophet statsmodels
+        sudo apt-get update
+        sudo apt-get install -y jq
 
     - name: Find latest CSV file
       id: find_csv
@@ -61,3 +63,4 @@ jobs:
         else
           git commit -m "Auto prediction for latest BTC data"
           git push
+        fi
