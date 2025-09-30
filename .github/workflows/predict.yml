@@ -1,8 +1,6 @@
 name: Bitcoin Quick Prediction
 
 on:
-  schedule:
-    - cron: '0 1 * * *' # Her gece 01:00'da çalışır
   workflow_dispatch:
 
 jobs:
@@ -23,16 +21,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas prophet statsmodels
 
-    - name: Find latest CSV file
-      id: find_csv
-      run: |
-        latest_csv=$(ls -t data/BTC_USD_*.csv | head -n 1)
-        echo "LATEST_CSV=$latest_csv" >> $GITHUB_ENV
-
     - name: Run quick prediction and save results
       run: |
         mkdir -p prediction
-        python src/quick_predict.py $LATEST_CSV > prediction/latest_prediction.txt
+        python src/quick_predict.py data/BTC_USD_60days.csv > prediction/latest_prediction.txt
 
         # Prophet ve ARIMA tahminlerini JSON formatına çevir
         prophet_line=$(grep "Prophet ile" prediction/latest_prediction.txt | tail -1)
@@ -59,5 +51,5 @@ jobs:
         if git diff --staged --quiet; then
           echo "No prediction changes to commit"
         else
-          git commit -m "Auto prediction for latest BTC data"
+          git commit -m "Auto prediction for BTC_USD_60days.csv"
           git push
