@@ -1,10 +1,10 @@
 {
   "prophet": {
     "date": "2025-10-01",
-    "prediction": "120656.70"
+    "prediction": "120880.55"
   },
   "arima": {
     "date": "2025-10-01",
-    "prediction": "113720.27"
+    "prediction": "113803.37"
   }
 }
