@@ -65,5 +65,6 @@ jobs:
           echo "No prediction changes to commit"
         else
           git commit -m "Auto prediction for latest BTC data"
+          git pull --rebase origin main
           git push
         fi
