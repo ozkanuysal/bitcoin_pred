@@ -2,6 +2,9 @@ name: Bitcoin Quick Prediction
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   quick_predict:
