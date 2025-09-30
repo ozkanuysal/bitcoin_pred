@@ -38,29 +38,31 @@ jobs:
     - name: Run quick prediction and save results
       run: |
         mkdir -p prediction
-        python src/quick_predict.py $LATEST_CSV > prediction/latest_prediction.txt
+        python src/quick_predict.py $LATEST_CSV > prediction/tmp_prediction.txt
 
-        prophet_line=$(grep "Prophet ile" prediction/latest_prediction.txt | tail -1)
-        arima_line=$(grep "ARIMA ile" prediction/latest_prediction.txt | tail -1)
-        prophet_date=$(echo $prophet_line | awk '{print $3}')
+        prophet_line=$(grep "Prophet ile" prediction/tmp_prediction.txt | tail -1)
+        arima_line=$(grep "ARIMA ile" prediction/tmp_prediction.txt | tail -1)
+        # Tahmin edilen tarihi al (ör: 2025-10-01)
+        predict_date=$(echo $prophet_line | awk '{print $3}')
+        predict_date_fmt=$(echo $predict_date | tr '-' '_')
+        json_file="prediction/${predict_date_fmt}_predictions.json"
         prophet_value=$(echo $prophet_line | awk '{print $6}')
-        arima_date=$(echo $arima_line | awk '{print $3}')
         arima_value=$(echo $arima_line | awk '{print $6}')
         jq -n \
-          --arg prophet_date "$prophet_date" \
+          --arg prophet_date "$predict_date" \
           --arg prophet_value "$prophet_value" \
-          --arg arima_date "$arima_date" \
+          --arg arima_date "$predict_date" \
           --arg arima_value "$arima_value" \
           '{
             "prophet": {"date": $prophet_date, "prediction": $prophet_value},
             "arima": {"date": $arima_date, "prediction": $arima_value}
-          }' > prediction/latest_prediction.json
+          }' > $json_file
 
     - name: Commit and push predictions
       run: |
         git config --global user.name 'GitHub Actions Bot'
         git config --global user.email 'actions@github.com'
-        git add prediction/latest_prediction.json prediction/latest_prediction.txt
+        git add prediction/*.json
         if git diff --staged --quiet; then
           echo "No prediction changes to commit"
         else
