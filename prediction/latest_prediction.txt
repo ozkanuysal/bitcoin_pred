@@ -1,4 +1,0 @@
-Prophet tahmini:
-Prophet ile 2025-10-01 için tahmin: 120656.70 USD
-ARIMA tahmini:
-ARIMA ile 2025-10-01 için tahmin: 113720.27 USD
