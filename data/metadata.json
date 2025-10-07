@@ -1,8 +1,8 @@
 {
-  "last_update": "2025-10-06T00:08:18.545639",
+  "last_update": "2025-10-07T00:07:51.052080",
   "symbol": "BTC/USD",
-  "days": 75,
-  "records": 1802,
-  "filename": "BTC_USD_75days.csv",
+  "days": 76,
+  "records": 1826,
+  "filename": "BTC_USD_76days.csv",
   "source": "CoinGecko"
 }
