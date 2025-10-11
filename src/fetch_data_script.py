@@ -9,20 +9,19 @@ import json
 def get_bitcoin_historical_data(days_ago=30):
     """CoinGecko API'den Bitcoin fiyat verilerini çeker"""
     # CoinGecko API endpoint
-    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range"
     
-    # Şimdiki zaman (Unix timestamp, ms)
     yesterday_end = datetime.now() - timedelta(days=1)
     yesterday_end = yesterday_end.replace(hour=23, minute=59, second=59 , microsecond=0)
-    end_time = int(yesterday_end.timestamp() * 1000)
-    # Belirtilen gün sayısı kadar önceki zaman
-    start_time = int((yesterday_end - timedelta(days=days_ago)).timestamp() * 1000)
+    
+    start_time = int((yesterday_end - timedelta(days=days_ago)).timestamp())
+    end_time = int(yesterday_end.timestamp())
+
     # API parametreleri
     params = {
         'vs_currency': 'usd',
-        'from': start_time // 1000,  # saniye cinsinden 
-        'to': end_time // 1000,      # saniye cinsinden
-        'days': days_ago
+        'from': start_time,  # saniye cinsinden
+        'to': end_time,      # saniye cinsinden
     }
     
     try:
@@ -47,26 +46,21 @@ def get_bitcoin_historical_data(days_ago=30):
         
         # Timestamp'i datetime'a dönüştür
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df['date'] = df['timestamp'].dt.date
-        
-        # OHLC verisi için - CoinGecko sadece kapanış fiyatı veriyor, 
-        # basit bir yaklaşımla aynı değeri diğer alanlara kopyalayalım
-        df['open'] = df['close']
-        
-        # Yüzde değişimi hesapla (bir önceki kayda göre)
-        # Önce timestamp'e göre sırala (eskiden yeniye)
-        df = df.sort_values(by='timestamp', ascending=True)
-        # Fiyat değişimini hesapla (yüzde olarak)
-        df['change'] = df['close'].pct_change() * 100
-        # İlk satır için NaN değeri 0 olarak değiştir
-        df['change'] = df['change'].fillna(0)
-        # En yeni kayıtlar üstte olacak şekilde yeniden sırala
-        df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
-        
-        # Sadece istenen sütunları seç
-        df = df[['timestamp', 'date', 'open', 'volume', 'change']]
-        
-        return df
+        print(f" Toplam {len(df)} kayıt çekildi.")
+        df = df.set_index('timestamp')
+        df_hourly = df.resample("1H").agg({'close': 'last', 'volume': 'sum'})
+        df_hourly = df_hourly.dropna().reset_index()
+        print(f"Resample sonrası {len(df_hourly)} saatlik kayıt mevcut.")
+
+        df_hourly['date'] = df_hourly['timestamp'].dt.date
+        df_hourly['open'] = df_hourly['close']
+        df_hourly = df_hourly.sort_values(by='timestamp', ascending=True)
+        df_hourly['change'] = df_hourly['close'].pct_change() * 100
+        df_hourly['change'] = df_hourly['change'].fillna(0)
+        df_hourly = df_hourly.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        df_final = df_hourly[['timestamp', 'date', 'open', 'close', 'volume', 'change']]
+        return df_final
+
             
     except Exception as e:
         print(f"Veri çekerken hata oluştu: {e}")
