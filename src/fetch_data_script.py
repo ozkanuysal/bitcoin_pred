@@ -12,10 +12,11 @@ def get_bitcoin_historical_data(days_ago=30):
     url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
     
     # Şimdiki zaman (Unix timestamp, ms)
-    end_time = int(datetime.now().timestamp() * 1000)
+    yesterday_end = datetime.now() - timedelta(days=1)
+    yesterday_end = yesterday_end.replace(hour=23, minute=59, second=59 , microsecond=0)
+    end_time = int(yesterday_end.timestamp() * 1000)
     # Belirtilen gün sayısı kadar önceki zaman
-    start_time = int((datetime.now() - timedelta(days=days_ago)).timestamp() * 1000)
-    
+    start_time = int((yesterday_end - timedelta(days=days_ago)).timestamp() * 1000)
     # API parametreleri
     params = {
         'vs_currency': 'usd',
@@ -26,6 +27,7 @@ def get_bitcoin_historical_data(days_ago=30):
     
     try:
         print(f"CoinGecko API'den son {days_ago} günün verilerini çekiyorum...")
+        print(" Veri aralığı:", {yesterday_end - timedelta(days=days_ago), " - ", yesterday_end})
         response = requests.get(url, params=params)
         response.raise_for_status()  # Hata durumunda exception fırlat
         
@@ -97,13 +99,20 @@ def main():
     
     # Son çekilen verileri metadata olarak kaydet
     metadata_file = os.path.join(data_dir, "metadata.json")
+    yesterday_end = datetime.now() - timedelta(days=1)
+    yesterday_end = yesterday_end.replace(hour=23, minute=59, second=59 , microsecond=0)
+
     metadata = {
         "last_update": datetime.now().isoformat(),
         "symbol": "BTC/USD",
         "days": days_ago,
         "records": len(df),
         "filename": filename,
-        "source": "CoinGecko"
+        "source": "CoinGecko",
+        "data_end_date": yesterday_end.isoformat(),
+        "data_start_date": (yesterday_end - timedelta(days=days_ago)).isoformat(),
+        "note": "Data include complete days up to yesterday."
+
     }
     
     with open(metadata_file, 'w') as f:

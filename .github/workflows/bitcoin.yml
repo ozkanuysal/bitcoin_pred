@@ -59,7 +59,17 @@ jobs:
     - name: Fetch Bitcoin data
       run: |
         python src/fetch_data_script.py ${{ steps.calculate-days.outputs.DAYS }}
+
+    - name: Clean old CSV (keep last 10 files)
+      run: |
       
+        echo "Cleaning old CSV files..."
+        cd data
+        ls -t BTC_USD_*.csv | tail -n +11 | xargs rm -f
+        echo "Old CSV files cleaned. Remaining files:"
+        ls -lt BTC_USD_*.csv | head -n 10
+        cd ..
+
     - name: Set up Git
       run: |
         git config --global user.name 'GitHub Actions Bot'

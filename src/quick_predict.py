@@ -33,10 +33,31 @@ def load_csv_flexible(csv_path):
 
 def predict_next_day_prophet(csv_path):
     prophet_df, _ = load_csv_flexible(csv_path)
+
+    prophet_df["date_only"] = prophet_df['ds'].dt.date
+    daily_df = prophet_df.groupby("date_only").agg({'y': 'last'}).reset_index()
+    daily_df.columns = ['ds', 'y']
+    daily_df['ds'] = pd.to_datetime(daily_df['ds'])
+
+    last_date = daily_df['ds'].max()
+    hours_in_last_day = prophet_df[prophet_df['ds'].dt.date == last_date.date()].shape[0]
+    if hours_in_last_day < 20:
+        print(f"Uyarı: Son gün ({last_date.date()}) eksik veri içeriyor ({hours_in_last_day} saat). Prophet tahmini yanıltıcı olabilir.")
+        daily_df = daily_df[daily_df['ds'] < last_date]
+
+        if daily_df.empty:
+            print("Yeterli veri yok, tahmin yapılamıyor.")
+            return
+        last_date = daily_df['ds'].max()
+        print(f"Son tam gün olarak {last_date.date()} kullanılıyor.")
+
+    print(f"Prophet modeli için veri aralığı: {daily_df['ds'].min().date()} - {daily_df['ds'].max().date()} ({len(daily_df)} gün)")
+
+
+
     model = Prophet(yearly_seasonality=True, weekly_seasonality=True)
-    model.fit(prophet_df)
-    # Son tarihi bul ve bir gün ekle
-    last_date = prophet_df['ds'].max()
+    model.fit(daily_df)
+    # Bir sonraki gün için tahmin
     next_day = last_date + pd.Timedelta(days=1)
     future = pd.DataFrame({'ds': [next_day]})
     forecast = model.predict(future)
@@ -52,9 +73,25 @@ def predict_next_day_arima(csv_path):
     daily_series = price_series.resample('D').last()
     # Eksik günleri doldur (forward fill)
     daily_series = daily_series.ffill()
+
+    last_date_idx = daily_series.index[-1]
+    hourly_in_last_day = price_series[price_series.index.date == last_date_idx.date()].shape[0]
+
+    if hourly_in_last_day < 20:
+        print(f"Uyarı: Son gün ({last_date_idx.date()}) eksik veri içeriyor ({hourly_in_last_day} saat). ARIMA tahmini yanıltıcı olabilir.")
+        daily_series = daily_series[:-1]
+
+        if daily_series.empty:
+            print("Yeterli veri yok, tahmin yapılamıyor.")
+            return
+        print(f"Son tam gün olarak {daily_series.index[-1].date()} kullanılıyor.")
+
+
     # Son 365 gün ile sınırla (varsa)
     if len(daily_series) > 365:
         daily_series = daily_series.iloc[-365:]
+        print(f"ARIMA modeli için son 365 gün kullanılıyor: {daily_series.index.min().date()} - {daily_series.index.max().date()}")
+    
     # ARIMA modeli
     model = sm.tsa.ARIMA(daily_series, order=(1, 1, 1))
     arima_result = model.fit()
