@@ -27,11 +27,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # Install compatible NumPy version first (Prophet 1.1.5 needs NumPy < 2.0)
+        pip install "numpy<2.0"
         pip install pandas statsmodels
         # Install cmdstanpy first, then Prophet with compatible versions
         pip install cmdstanpy==1.2.0
         pip install prophet==1.1.5 --no-deps
-        pip install numpy pandas pystan holidays python-dateutil tqdm importlib-resources
+        pip install pystan holidays python-dateutil tqdm importlib-resources
         sudo apt-get update
         sudo apt-get install -y jq
 
