@@ -8,7 +8,6 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
-    
 permissions:
   contents: write
 
@@ -32,7 +31,7 @@ jobs:
         # Install cmdstanpy first, then Prophet with compatible versions
         pip install cmdstanpy==1.2.0
         pip install prophet==1.1.5 --no-deps
-        pip install numpy pandas pystan holidays python-dateutil tqdm
+        pip install numpy pandas pystan holidays python-dateutil tqdm importlib-resources
         sudo apt-get update
         sudo apt-get install -y jq
 
