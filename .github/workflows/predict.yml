@@ -1,5 +1,4 @@
 name: Bitcoin Quick Prediction
-
 on:
   push:
     branches:
@@ -7,23 +6,18 @@ on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   quick_predict:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.10'
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -36,40 +30,92 @@ jobs:
         pip install pystan holidays python-dateutil tqdm importlib-resources
         sudo apt-get update
         sudo apt-get install -y jq
-
     - name: Install CmdStan
       run: |
         python -c "import cmdstanpy; cmdstanpy.install_cmdstan()"
-
     - name: Find latest CSV file
       id: find_csv
       run: |
         latest_csv=$(ls -t data/BTC_USD_*.csv | head -n 1)
         echo "LATEST_CSV=$latest_csv" >> $GITHUB_ENV
-
     - name: Run quick prediction and save results
       run: |
         mkdir -p prediction
+        
+        # Python script çalıştır ve çıktıyı kaydet
         python src/quick_predict.py $LATEST_CSV > prediction/tmp_prediction.txt
-
+        
+        # Debug: Çıktıyı görüntüle
+        echo "=== Prediction Output ==="
+        cat prediction/tmp_prediction.txt
+        echo "========================"
+        
+        # Tahmin satırlarını al
         prophet_line=$(grep "Prophet ile" prediction/tmp_prediction.txt | tail -1)
         arima_line=$(grep "ARIMA ile" prediction/tmp_prediction.txt | tail -1)
-        # Tahmin edilen tarihi al (ör: 2025-10-01)
-        predict_date=$(echo $prophet_line | awk '{print $3}')
+        
+        # Eğer tahmin satırları yoksa hata ver
+        if [ -z "$prophet_line" ] || [ -z "$arima_line" ]; then
+          echo "ERROR: Prediction lines not found!"
+          echo "Prophet line: $prophet_line"
+          echo "ARIMA line: $arima_line"
+          exit 1
+        fi
+        
+        # Yarın için tarih oluştur (tahmin her zaman bir sonraki gün için)
+        predict_date=$(date -d "tomorrow" +%Y-%m-%d)
         predict_date_fmt=$(echo $predict_date | tr '-' '_')
+        
+        echo "Prediction date: $predict_date"
+        echo "File name: ${predict_date_fmt}_predictions.json"
+        
         json_file="prediction/${predict_date_fmt}_predictions.json"
-        prophet_value=$(echo $prophet_line | awk '{print $6}')
-        arima_value=$(echo $arima_line | awk '{print $6}')
+        
+        # Prophet ve ARIMA değerlerini al (son sütun)
+        prophet_value=$(echo $prophet_line | awk '{print $NF}')
+        arima_value=$(echo $arima_line | awk '{print $NF}')
+        
+        echo "Prophet value: $prophet_value"
+        echo "ARIMA value: $arima_value"
+        
+        # JSON dosyası oluştur
         jq -n \
           --arg prophet_date "$predict_date" \
           --arg prophet_value "$prophet_value" \
           --arg arima_date "$predict_date" \
           --arg arima_value "$arima_value" \
+          --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           '{
-            "prophet": {"date": $prophet_date, "prediction": $prophet_value},
-            "arima": {"date": $arima_date, "prediction": $arima_value}
+            "prediction_date": $prophet_date,
+            "created_at": $created_at,
+            "prophet": {
+              "date": $prophet_date, 
+              "prediction": $prophet_value
+            },
+            "arima": {
+              "date": $arima_date, 
+              "prediction": $arima_value
+            }
           }' > $json_file
-
+        
+        # Dosyanın oluşturulduğunu doğrula
+        if [ -f "$json_file" ]; then
+          echo "SUCCESS: Prediction file created: $json_file"
+          cat $json_file
+        else
+          echo "ERROR: Failed to create prediction file!"
+          exit 1
+        fi
+        
+    - name: Verify prediction file exists
+      run: |
+        if [ -z "$(ls -A prediction/*.json 2>/dev/null)" ]; then
+          echo "ERROR: No prediction JSON files found!"
+          exit 1
+        fi
+        echo "Prediction files found:"
+        ls -lh prediction/*.json
+        
     - name: Commit and push predictions
       run: |
         git config --global user.name 'GitHub Actions Bot'
@@ -78,7 +124,8 @@ jobs:
         if git diff --staged --quiet; then
           echo "No prediction changes to commit"
         else
-          git commit -m "Auto prediction for latest BTC data"
+          prediction_file=$(ls -t prediction/*.json | head -n 1)
+          git commit -m "Auto prediction for $(basename $prediction_file .json)"
           git pull --rebase origin main
           git push
         fi
