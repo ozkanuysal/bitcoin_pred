@@ -47,28 +47,36 @@ def predict_next_day_prophet(csv_path):
 
         if daily_df.empty:
             print("Yeterli veri yok, tahmin yapılamıyor.")
-            return
+            return None  # ← Hata durumunda None dön
         last_date = daily_df['ds'].max()
         print(f"Son tam gün olarak {last_date.date()} kullanılıyor.")
 
     print(f"Prophet modeli için veri aralığı: {daily_df['ds'].min().date()} - {daily_df['ds'].max().date()} ({len(daily_df)} gün)")
 
-
-
     model = Prophet(yearly_seasonality=True, weekly_seasonality=True)
     model.fit(daily_df)
+    
     # Bir sonraki gün için tahmin
     next_day = last_date + pd.Timedelta(days=1)
     future = pd.DataFrame({'ds': [next_day]})
     forecast = model.predict(future)
     yhat = forecast.iloc[0]['yhat']
     print(f"Prophet ile {next_day.date()} için tahmin: {yhat:.2f} USD")
+    
+    # ← DEĞERİ DÖNDÜR
+    return {
+        'date': str(next_day.date()),
+        'prediction': float(yhat)
+    }
+
 
 def predict_next_day_arima(csv_path):
     _, price_series = load_csv_flexible(csv_path)
+    
     # Indexi sıralı ve unique yap
     price_series = price_series.sort_index()
     price_series = price_series[~price_series.index.duplicated(keep='first')]
+    
     # Günlük kapanış fiyatı için yeniden örnekle
     daily_series = price_series.resample('D').last()
     # Eksik günleri doldur (forward fill)
@@ -83,9 +91,8 @@ def predict_next_day_arima(csv_path):
 
         if daily_series.empty:
             print("Yeterli veri yok, tahmin yapılamıyor.")
-            return
+            return None  # ← Hata durumunda None dön
         print(f"Son tam gün olarak {daily_series.index[-1].date()} kullanılıyor.")
-
 
     # Son 365 gün ile sınırla (varsa)
     if len(daily_series) > 365:
@@ -95,12 +102,19 @@ def predict_next_day_arima(csv_path):
     # ARIMA modeli
     model = sm.tsa.ARIMA(daily_series, order=(1, 1, 1))
     arima_result = model.fit()
+    
     # Son tarihi bul ve bir gün ekle
     last_date = daily_series.index.max()
     next_day = last_date + pd.Timedelta(days=1)
     forecast = arima_result.get_forecast(steps=1)
     predicted = forecast.predicted_mean.iloc[0]
     print(f"ARIMA ile {next_day.date()} için tahmin: {predicted:.2f} USD")
+    
+    # ← DEĞERİ DÖNDÜR
+    return {
+        'date': str(next_day.date()),
+        'prediction': float(predicted)
+    }
 
 if __name__ == "__main__":
     # Komut satırından dosya adı al
