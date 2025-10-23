@@ -1,12 +1,12 @@
 {
   "prediction_date": "2025-10-24",
-  "created_at": "2025-10-23T18:17:51Z",
+  "created_at": "2025-10-23T18:25:00Z",
   "prophet": {
     "date": "2025-10-24",
-    "prediction": "USD"
+    "prediction": 110953.39
   },
   "arima": {
     "date": "2025-10-24",
-    "prediction": "USD"
+    "prediction": 107015.33
   }
 }
