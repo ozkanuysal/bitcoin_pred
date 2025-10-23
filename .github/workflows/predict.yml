@@ -71,19 +71,29 @@ jobs:
         
         json_file="prediction/${predict_date_fmt}_predictions.json"
         
-        # Prophet ve ARIMA değerlerini al (son sütun)
-        prophet_value=$(echo $prophet_line | awk '{print $NF}')
-        arima_value=$(echo $arima_line | awk '{print $NF}')
+        # Prophet ve ARIMA değerlerini al - DÜZELTME BURADA
+        # Örnek satır: "Prophet ile 2025-10-24 için tahmin: 34.56 USD"
+        # Sadece sayıyı almak için "USD" kelimesinden önceki değeri al
+        prophet_value=$(echo $prophet_line | grep -oP '\d+\.\d+(?= USD)')
+        arima_value=$(echo $arima_line | grep -oP '\d+\.\d+(?= USD)')
         
-        echo "Prophet value: $prophet_value"
-        echo "ARIMA value: $arima_value"
+        echo "Prophet value extracted: $prophet_value"
+        echo "ARIMA value extracted: $arima_value"
+        
+        # Eğer değerler boşsa hata ver
+        if [ -z "$prophet_value" ] || [ -z "$arima_value" ]; then
+          echo "ERROR: Could not extract prediction values!"
+          echo "Prophet value: $prophet_value"
+          echo "ARIMA value: $arima_value"
+          exit 1
+        fi
         
         # JSON dosyası oluştur
         jq -n \
           --arg prophet_date "$predict_date" \
-          --arg prophet_value "$prophet_value" \
+          --argjson prophet_value "$prophet_value" \
           --arg arima_date "$predict_date" \
-          --arg arima_value "$arima_value" \
+          --argjson arima_value "$arima_value" \
           --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           '{
             "prediction_date": $prophet_date,
