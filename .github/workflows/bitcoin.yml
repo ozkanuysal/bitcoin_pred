@@ -5,7 +5,7 @@ on:
     branches:
       - main 
   schedule:
-    - cron: '0 0 * * *' # Her gün saat 00:00'da çalıştır ()
+    - cron: '0 0 * * *' # Her gün saat 00:00'da çalıştır
   workflow_dispatch:
 
 # Workflow için gereken izinleri ekleyin
@@ -32,41 +32,65 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests pandas
       
-    - name: Calculate days based on existing files
+    - name: Calculate next day number
       id: calculate-days
       run: |
-        # Metadata dosyasını kontrol et
+        # metadata.json dosyasını kontrol et
         if [ -f "data/metadata.json" ]; then
-          # Son kullanılan gün sayısını al
-          LAST_DAYS=$(grep -o '"days": [0-9]*' data/metadata.json | awk '{print $2}')
+          # Son kullanılan gün sayısını ve tarihini al
+          LAST_DAYS=$(grep -oP '"days":\s*\K\d+' data/metadata.json)
+          LAST_UPDATE=$(grep -oP '"last_update":\s*"\K[^"]+' data/metadata.json)
+          LAST_UPDATE_DATE=$(echo $LAST_UPDATE | cut -d'T' -f1)
+          TODAY=$(date -u +%Y-%m-%d)
+          
+          echo "Last update: $LAST_UPDATE_DATE"
+          echo "Today: $TODAY"
+          
+          # Bugün zaten çalıştırıldı mı kontrol et
+          if [ "$LAST_UPDATE_DATE" == "$TODAY" ]; then
+            echo "⚠️  Data already fetched today ($TODAY). Skipping..."
+            echo "SKIP=true" >> $GITHUB_OUTPUT
+            echo "DAYS=$LAST_DAYS" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           # Bir sonraki gün sayısını hesapla
-          DAYS=$((LAST_DAYS + 1))
+          NEXT_DAY=$((LAST_DAYS + 1))
+          echo "Found last day: $LAST_DAYS, next day will be: $NEXT_DAY"
         else
-          # İlk çalıştırma, varsayılan gün sayısını kullan
-          DAYS=30
+          # İlk çalıştırma, 1'den başla
+          NEXT_DAY=1
+          echo "No metadata.json found. Starting from day 1"
         fi
         
-        # Fazla büyümeyi önlemek için üst sınır (isteğe bağlı)
-        if [ $DAYS -gt 365 ]; then
-          DAYS=30
-        fi
-        
-        echo "DAYS=$DAYS" >> $GITHUB_OUTPUT
-        echo "Fetching data for last $DAYS days"
+        echo "SKIP=false" >> $GITHUB_OUTPUT
+        echo "DAYS=$NEXT_DAY" >> $GITHUB_OUTPUT
+        echo "Fetching data for day $NEXT_DAY"
       
     - name: Fetch Bitcoin data
+      if: steps.calculate-days.outputs.SKIP != 'true'
       run: |
         python src/fetch_data_script.py ${{ steps.calculate-days.outputs.DAYS }}
 
-    - name: Clean old CSV (keep last 10 files)
+    - name: Clean old CSV files (keep last 10)
+      if: steps.calculate-days.outputs.SKIP != 'true'
       run: |
-      
         echo "Cleaning old CSV files..."
-        cd data
-        ls -t BTC_USD_*.csv | tail -n +11 | xargs rm -f
-        echo "Old CSV files cleaned. Remaining files:"
-        ls -lt BTC_USD_*.csv | head -n 10
-        cd ..
+        if [ -d "data" ] && [ "$(ls -A data/BTC_USD_*days.csv 2>/dev/null)" ]; then
+          cd data
+          # Dosyaları gün sayısına göre sırala ve ilk 10'u tut, geri kalanını sil
+          file_count=$(ls BTC_USD_*days.csv 2>/dev/null | wc -l)
+          if [ "$file_count" -gt 10 ]; then
+            ls BTC_USD_*days.csv | sort -V | head -n $((file_count - 10)) | xargs rm -f
+            echo "Deleted old files. Remaining files:"
+          else
+            echo "File count ($file_count) is 10 or less. No deletion needed. Current files:"
+          fi
+          ls -1 BTC_USD_*days.csv 2>/dev/null | sort -V
+          cd ..
+        else
+          echo "No files to clean"
+        fi
 
     - name: Set up Git
       run: |
@@ -74,6 +98,7 @@ jobs:
         git config --global user.email 'actions@github.com'
       
     - name: Commit and push changes
+      if: steps.calculate-days.outputs.SKIP != 'true'
       run: |
         git add data/
         
@@ -81,6 +106,6 @@ jobs:
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Auto fetch BTC data for last ${{ steps.calculate-days.outputs.DAYS }} days"
+          git commit -m "Auto fetch BTC data for day ${{ steps.calculate-days.outputs.DAYS }}"
           git push
         fi
