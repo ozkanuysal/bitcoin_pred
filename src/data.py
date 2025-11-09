@@ -37,7 +37,7 @@ def handle_timestamps(df):
 @st.cache_data
 def load_data():
     st.info("Loading Bitcoin historical data...")
-    file_path = '/home/ozkan/Desktop/bitcoin_prediction/bitcoin_pred/Bitcoin_Historical_Data.csv'
+    file_path = '/home/ozkan/Desktop/bitcoin/bitcoin_pred/Bitcoin_Historical_Data.csv'
     
     df = load_csv_data(file_path)
     df = preprocess_data(df)
