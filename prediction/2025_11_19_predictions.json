@@ -1,0 +1,12 @@
+{
+  "prediction_date": "2025-11-19",
+  "created_at": "2025-11-18T03:31:48Z",
+  "prophet": {
+    "date": "2025-11-19",
+    "prediction": 93104.70
+  },
+  "arima": {
+    "date": "2025-11-19",
+    "prediction": 102247.80
+  }
+}
