@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     - name: Install dependencies
@@ -38,85 +38,41 @@ jobs:
       run: |
         latest_csv=$(ls -t data/BTC_USD_*.csv | head -n 1)
         echo "LATEST_CSV=$latest_csv" >> $GITHUB_ENV
-    - name: Run quick prediction and save results
+        echo "Found latest CSV: $latest_csv"
+    - name: Run multi-window prediction
       run: |
         mkdir -p prediction
-        
-        # Python script çalıştır ve çıktıyı kaydet
-        python src/quick_predict.py $LATEST_CSV > prediction/tmp_prediction.txt
-        
-        # Debug: Çıktıyı görüntüle
-        echo "=== Prediction Output ==="
-        cat prediction/tmp_prediction.txt
-        echo "========================"
-        
-        # Tahmin satırlarını al
-        prophet_line=$(grep "Prophet ile" prediction/tmp_prediction.txt | tail -1)
-        arima_line=$(grep "ARIMA ile" prediction/tmp_prediction.txt | tail -1)
-        
-        # Eğer tahmin satırları yoksa hata ver
-        if [ -z "$prophet_line" ] || [ -z "$arima_line" ]; then
-          echo "ERROR: Prediction lines not found!"
-          echo "Prophet line: $prophet_line"
-          echo "ARIMA line: $arima_line"
-          exit 1
-        fi
-        
-        # Yarın için tarih oluştur (tahmin her zaman bir sonraki gün için)
+
+        # Yarın için tarih oluştur
         predict_date=$(date -d "tomorrow" +%Y-%m-%d)
         predict_date_fmt=$(echo $predict_date | tr '-' '_')
-        
-        echo "Prediction date: $predict_date"
-        echo "File name: ${predict_date_fmt}_predictions.json"
-        
         json_file="prediction/${predict_date_fmt}_predictions.json"
-        
-        # Prophet ve ARIMA değerlerini al - DÜZELTME BURADA
-        # Örnek satır: "Prophet ile 2025-10-24 için tahmin: 34.56 USD"
-        # Sadece sayıyı almak için "USD" kelimesinden önceki değeri al
-        prophet_value=$(echo $prophet_line | grep -oP '\d+\.\d+(?= USD)')
-        arima_value=$(echo $arima_line | grep -oP '\d+\.\d+(?= USD)')
-        
-        echo "Prophet value extracted: $prophet_value"
-        echo "ARIMA value extracted: $arima_value"
-        
-        # Eğer değerler boşsa hata ver
-        if [ -z "$prophet_value" ] || [ -z "$arima_value" ]; then
-          echo "ERROR: Could not extract prediction values!"
-          echo "Prophet value: $prophet_value"
-          echo "ARIMA value: $arima_value"
-          exit 1
-        fi
-        
-        # JSON dosyası oluştur
-        jq -n \
-          --arg prophet_date "$predict_date" \
-          --argjson prophet_value "$prophet_value" \
-          --arg arima_date "$predict_date" \
-          --argjson arima_value "$arima_value" \
-          --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          '{
-            "prediction_date": $prophet_date,
-            "created_at": $created_at,
-            "prophet": {
-              "date": $prophet_date, 
-              "prediction": $prophet_value
-            },
-            "arima": {
-              "date": $arima_date, 
-              "prediction": $arima_value
-            }
-          }' > $json_file
-        
-        # Dosyanın oluşturulduğunu doğrula
-        if [ -f "$json_file" ]; then
-          echo "SUCCESS: Prediction file created: $json_file"
-          cat $json_file
-        else
-          echo "ERROR: Failed to create prediction file!"
-          exit 1
-        fi
-        
+
+        echo "Prediction date: $predict_date"
+        echo "Output file: $json_file"
+
+        # Python script'i JSON modunda çalıştır
+        python src/quick_predict.py $LATEST_CSV --json > prediction/tmp_output.json
+
+        # Debug: Çıktıyı görüntüle
+        echo "=== Raw JSON Output ==="
+        cat prediction/tmp_output.json
+        echo "======================="
+
+        # jq ile prediction_date ve created_at ekle
+        jq --arg pd "$predict_date" \
+           --arg ca "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+           '{prediction_date: $pd, created_at: $ca} + .' \
+           prediction/tmp_output.json > "$json_file"
+
+        # Geçici dosyayı sil
+        rm -f prediction/tmp_output.json
+
+        # Final JSON'ı göster
+        echo "=== Final Prediction JSON ==="
+        cat "$json_file"
+        echo "============================="
+
     - name: Verify prediction file exists
       run: |
         if [ -z "$(ls -A prediction/*.json 2>/dev/null)" ]; then
@@ -125,7 +81,7 @@ jobs:
         fi
         echo "Prediction files found:"
         ls -lh prediction/*.json
-        
+
     - name: Commit and push predictions
       run: |
         git config --global user.name 'GitHub Actions Bot'
