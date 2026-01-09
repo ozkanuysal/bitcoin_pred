@@ -1,11 +1,11 @@
 {
-  "last_update": "2026-01-08T00:09:24.046397",
+  "last_update": "2026-01-09T00:08:57.759447",
   "symbol": "BTC/USD",
-  "days": 175,
-  "records": 175,
-  "filename": "BTC_USD_175days.csv",
+  "days": 176,
+  "records": 176,
+  "filename": "BTC_USD_176days.csv",
   "source": "CoinGecko",
-  "data_end_date": "2026-01-07T23:59:59",
+  "data_end_date": "2026-01-08T23:59:59",
   "data_start_date": "2025-07-16T23:59:59",
   "note": "Data include complete days up to yesterday."
 }
