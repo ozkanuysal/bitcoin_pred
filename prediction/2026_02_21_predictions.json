@@ -1,0 +1,75 @@
+{
+  "prediction_date": "2026-02-21",
+  "created_at": "2026-02-20T03:56:11Z",
+  "data_info": {
+    "total_days_available": 211,
+    "data_source": "CoinGecko",
+    "latest_price": 66937.58
+  },
+  "prophet": {
+    "date": "2026-02-13",
+    "prediction": 67797.83,
+    "windows": {
+      "30_days": {
+        "prediction": 61240.78,
+        "data_range": "2026-01-14 to 2026-02-12"
+      },
+      "60_days": {
+        "prediction": 69029.98,
+        "data_range": "2025-12-15 to 2026-02-12"
+      },
+      "90_days": {
+        "prediction": 69214.29,
+        "data_range": "2025-11-15 to 2026-02-12"
+      },
+      "120_days": {
+        "prediction": 65646.71,
+        "data_range": "2025-10-16 to 2026-02-12"
+      }
+    },
+    "ensemble": {
+      "prediction": 65612.84,
+      "weights": {
+        "30_days": 0.4,
+        "60_days": 0.3,
+        "90_days": 0.2,
+        "120_days": 0.1
+      }
+    }
+  },
+  "arima": {
+    "date": "2026-02-13",
+    "prediction": 68785.43,
+    "windows": {
+      "30_days": {
+        "prediction": 66499.26,
+        "data_range": "2026-01-14 to 2026-02-12"
+      },
+      "60_days": {
+        "prediction": 66996.63,
+        "data_range": "2025-12-15 to 2026-02-12"
+      },
+      "90_days": {
+        "prediction": 66942.77,
+        "data_range": "2025-11-15 to 2026-02-12"
+      },
+      "120_days": {
+        "prediction": 67003.85,
+        "data_range": "2025-10-16 to 2026-02-12"
+      }
+    },
+    "ensemble": {
+      "prediction": 66787.63,
+      "weights": {
+        "30_days": 0.4,
+        "60_days": 0.3,
+        "90_days": 0.2,
+        "120_days": 0.1
+      }
+    }
+  },
+  "combined_ensemble": {
+    "prediction": 66200.24,
+    "method": "average of prophet and arima ensembles"
+  }
+}
