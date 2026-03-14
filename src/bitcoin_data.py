@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from .binance_data import BinanceDataFetcher
-import matplotlib.pyplot as plt
 
 def bitcoin_data():
     st.title("Bitcoin Fiyat Verileri")

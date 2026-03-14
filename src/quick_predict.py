@@ -54,6 +54,12 @@ def load_csv_flexible(csv_path):
     prophet_df = df[[date_col, price_col]].rename(columns={date_col: 'ds', price_col: 'y'})
     return prophet_df, df.set_index('timestamp')[price_col]
 
+def _is_daily_data(df, date_col='ds'):
+    """Verinin günlük mü yoksa saatlik mi olduğunu tespit et"""
+    unique_dates = df[date_col].dt.date.nunique()
+    rows_per_day = len(df) / max(unique_dates, 1)
+    return rows_per_day < 2  # Gün başına ortalama < 2 satır ise günlük veri
+
 def predict_next_day_prophet(csv_path):
     prophet_df, _ = load_csv_flexible(csv_path)
 
@@ -63,16 +69,19 @@ def predict_next_day_prophet(csv_path):
     daily_df['ds'] = pd.to_datetime(daily_df['ds'])
 
     last_date = daily_df['ds'].max()
-    hours_in_last_day = prophet_df[prophet_df['ds'].dt.date == last_date.date()].shape[0]
-    if hours_in_last_day < 20:
-        log_message(f"Uyarı: Son gün ({last_date.date()}) eksik veri içeriyor ({hours_in_last_day} saat). Prophet tahmini yanıltıcı olabilir.")
-        daily_df = daily_df[daily_df['ds'] < last_date]
 
-        if daily_df.empty:
-            log_message("Yeterli veri yok, tahmin yapılamıyor.")
-            return None  # ← Hata durumunda None dön
-        last_date = daily_df['ds'].max()
-        log_message(f"Son tam gün olarak {last_date.date()} kullanılıyor.")
+    # Eksik gün kontrolü: sadece saatlik veri için uygula
+    if not _is_daily_data(prophet_df):
+        hours_in_last_day = prophet_df[prophet_df['ds'].dt.date == last_date.date()].shape[0]
+        if hours_in_last_day < 20:
+            log_message(f"Uyarı: Son gün ({last_date.date()}) eksik veri içeriyor ({hours_in_last_day} saat). Prophet tahmini yanıltıcı olabilir.")
+            daily_df = daily_df[daily_df['ds'] < last_date]
+
+            if daily_df.empty:
+                log_message("Yeterli veri yok, tahmin yapılamıyor.")
+                return None
+            last_date = daily_df['ds'].max()
+            log_message(f"Son tam gün olarak {last_date.date()} kullanılıyor.")
 
     log_message(f"Prophet modeli için veri aralığı: {daily_df['ds'].min().date()} - {daily_df['ds'].max().date()} ({len(daily_df)} gün)")
 
@@ -106,16 +115,19 @@ def predict_next_day_arima(csv_path):
     daily_series = daily_series.ffill()
 
     last_date_idx = daily_series.index[-1]
-    hourly_in_last_day = price_series[price_series.index.date == last_date_idx.date()].shape[0]
 
-    if hourly_in_last_day < 20:
-        log_message(f"Uyarı: Son gün ({last_date_idx.date()}) eksik veri içeriyor ({hourly_in_last_day} saat). ARIMA tahmini yanıltıcı olabilir.")
-        daily_series = daily_series[:-1]
+    # Eksik gün kontrolü: sadece saatlik veri için uygula
+    is_daily = price_series.index.date.nunique() >= len(price_series) * 0.5
+    if not is_daily:
+        hourly_in_last_day = price_series[price_series.index.date == last_date_idx.date()].shape[0]
+        if hourly_in_last_day < 20:
+            log_message(f"Uyarı: Son gün ({last_date_idx.date()}) eksik veri içeriyor ({hourly_in_last_day} saat). ARIMA tahmini yanıltıcı olabilir.")
+            daily_series = daily_series[:-1]
 
-        if daily_series.empty:
-            log_message("Yeterli veri yok, tahmin yapılamıyor.")
-            return None  # ← Hata durumunda None dön
-        log_message(f"Son tam gün olarak {daily_series.index[-1].date()} kullanılıyor.")
+            if daily_series.empty:
+                log_message("Yeterli veri yok, tahmin yapılamıyor.")
+                return None
+            log_message(f"Son tam gün olarak {daily_series.index[-1].date()} kullanılıyor.")
 
     # Son 365 gün ile sınırla (varsa)
     if len(daily_series) > 365:

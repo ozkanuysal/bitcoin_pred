@@ -43,22 +43,25 @@ def get_bitcoin_historical_data(days_ago=30):
         
         # DataFrame'leri birleştir
         df = pd.merge(df_prices, df_volumes, on='timestamp', how='left')
-        
+
         # Timestamp'i datetime'a dönüştür
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         print(f" Toplam {len(df)} kayıt çekildi.")
-        df = df.set_index('timestamp')
-        df_hourly = df.resample("1H").agg({'close': 'last', 'volume': 'sum'})
-        df_hourly = df_hourly.dropna().reset_index()
-        print(f"Resample sonrası {len(df_hourly)} saatlik kayıt mevcut.")
 
-        df_hourly['date'] = df_hourly['timestamp'].dt.date
-        df_hourly['open'] = df_hourly['close']
-        df_hourly = df_hourly.sort_values(by='timestamp', ascending=True)
-        df_hourly['change'] = df_hourly['close'].pct_change() * 100
-        df_hourly['change'] = df_hourly['change'].fillna(0)
-        df_hourly = df_hourly.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
-        df_final = df_hourly[['timestamp', 'date', 'open', 'close', 'volume', 'change']]
+        # Günlük veriye dönüştür (CoinGecko 90+ günde zaten günlük döndürür,
+        # kısa aralıklarda saatlik döndürür — her iki durumu da doğru handle et)
+        df = df.set_index('timestamp')
+        df_daily = df.resample("1D").agg({'close': 'last', 'volume': 'sum'})
+        df_daily = df_daily.dropna().reset_index()
+        print(f"Günlük resample sonrası {len(df_daily)} kayıt mevcut.")
+
+        df_daily['date'] = df_daily['timestamp'].dt.date
+        df_daily['open'] = df_daily['close']
+        df_daily = df_daily.sort_values(by='timestamp', ascending=True)
+        df_daily['change'] = df_daily['close'].pct_change() * 100
+        df_daily['change'] = df_daily['change'].fillna(0)
+        df_daily = df_daily.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        df_final = df_daily[['timestamp', 'date', 'open', 'close', 'volume', 'change']]
         return df_final
 
             

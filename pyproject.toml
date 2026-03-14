@@ -12,4 +12,5 @@ dependencies = [
     "streamlit>=1.47.1",
     "yfinance>=0.2.64",
     "statsmodels>=0.14.5",
+    "python-binance>=1.0.19",
 ]

@@ -1,8 +1,5 @@
 name: Bitcoin Quick Prediction
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
@@ -36,20 +33,24 @@ jobs:
     - name: Find latest CSV file
       id: find_csv
       run: |
-        latest_csv=$(ls -t data/BTC_USD_*.csv | head -n 1)
+        # metadata.json'dan en güncel CSV dosyasını oku
+        if [ -f "data/metadata.json" ]; then
+          latest_csv="data/$(python3 -c "import json; print(json.load(open('data/metadata.json'))['filename'])")"
+        else
+          # Fallback: dosya adındaki gün numarasına göre en büyüğü seç
+          latest_csv=$(ls data/BTC_USD_*.csv | sort -V | tail -n 1)
+        fi
+
+        if [ ! -f "$latest_csv" ]; then
+          echo "ERROR: CSV file not found: $latest_csv"
+          exit 1
+        fi
+
         echo "LATEST_CSV=$latest_csv" >> $GITHUB_ENV
         echo "Found latest CSV: $latest_csv"
     - name: Run multi-window prediction
       run: |
         mkdir -p prediction
-
-        # Yarın için tarih oluştur
-        predict_date=$(date -d "tomorrow" +%Y-%m-%d)
-        predict_date_fmt=$(echo $predict_date | tr '-' '_')
-        json_file="prediction/${predict_date_fmt}_predictions.json"
-
-        echo "Prediction date: $predict_date"
-        echo "Output file: $json_file"
 
         # Python script'i JSON modunda çalıştır
         python src/quick_predict.py $LATEST_CSV --json > prediction/tmp_output.json
@@ -58,6 +59,14 @@ jobs:
         echo "=== Raw JSON Output ==="
         cat prediction/tmp_output.json
         echo "======================="
+
+        # Tahmin tarihini Python çıktısından al (model'in gerçek tahmin tarihi)
+        predict_date=$(python3 -c "import json; d=json.load(open('prediction/tmp_output.json')); print(d['prophet']['date'])")
+        predict_date_fmt=$(echo $predict_date | tr '-' '_')
+        json_file="prediction/${predict_date_fmt}_predictions.json"
+
+        echo "Prediction date (from model): $predict_date"
+        echo "Output file: $json_file"
 
         # jq ile prediction_date ve created_at ekle
         jq --arg pd "$predict_date" \
@@ -90,7 +99,7 @@ jobs:
         if git diff --staged --quiet; then
           echo "No prediction changes to commit"
         else
-          prediction_file=$(ls -t prediction/*.json | head -n 1)
+          prediction_file=$(ls prediction/*.json | sort -V | tail -n 1)
           git commit -m "Auto prediction for $(basename $prediction_file .json)"
           git pull --rebase origin main
           git push

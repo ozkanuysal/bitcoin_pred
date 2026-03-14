@@ -8,8 +8,9 @@ from .bitcoin_data import bitcoin_data
 def main_ui():
     st.set_page_config(page_title="BTC Price Forecasting", layout="wide")
     st.sidebar.title("Navigation")
-    page = st.sidebar.selectbox("Choose a page", 
-                               ["Bitcoin Verileri", "General View", "Baseline Model", "ARIMA Forecast"], 
+    page = st.sidebar.selectbox("Choose a page",
+                               ["Bitcoin Verileri", "General View", "Baseline Model",
+                                "ARIMA Forecast", "Log Forecast", "Hyperparameter Tuning"],
                                index=0)
 
     if page == "General View":
@@ -20,3 +21,7 @@ def main_ui():
         arima_forecast()
     elif page == "Bitcoin Verileri":
         bitcoin_data()
+    elif page == "Log Forecast":
+        log_forecast()
+    elif page == "Hyperparameter Tuning":
+        hypertune_app()
