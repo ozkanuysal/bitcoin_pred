@@ -117,7 +117,8 @@ def predict_next_day_arima(csv_path):
     last_date_idx = daily_series.index[-1]
 
     # Eksik gün kontrolü: sadece saatlik veri için uygula
-    is_daily = price_series.index.date.nunique() >= len(price_series) * 0.5
+    is_daily = len(set(price_series.index.date)) >= len(price_series) * 0.5
+
     if not is_daily:
         hourly_in_last_day = price_series[price_series.index.date == last_date_idx.date()].shape[0]
         if hourly_in_last_day < 20:
