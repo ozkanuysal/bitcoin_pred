@@ -1,6 +1,6 @@
 {
   "prediction_date": "2026-07-16",
-  "created_at": "2026-07-26T06:13:38Z",
+  "created_at": "2026-07-27T06:37:42Z",
   "data_info": {
     "total_days_available": 364,
     "data_source": "CoinGecko",
@@ -54,7 +54,7 @@
         "data_range": "2026-04-17 to 2026-07-15"
       },
       "120_days": {
-        "prediction": 64881.05,
+        "prediction": 64881.06,
         "data_range": "2026-03-18 to 2026-07-15"
       }
     },
